@@ -11,6 +11,7 @@ This module sets up the FastAPI application with:
 import os
 import sys
 from pathlib import Path
+from contextlib import asynccontextmanager
 
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parent))
@@ -28,18 +29,51 @@ from agent import create_agent, EthanAgent
 from routes.auth import router as auth_router, get_current_user, require_auth, get_session_token
 
 
+# Global agent instance
+agent: EthanAgent = None
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Lifespan context manager for startup and shutdown events"""
+    global agent
+
+    # Startup
+    print("Initializing Personal Assistant AI Agent...")
+
+    # Initialize database
+    print("Initializing database...")
+    init_db()
+
+    # Create agent
+    print("Creating agent...")
+    agent = create_agent()
+
+    # Mount agent routes at internal path (accessed via token-validated routes)
+    print("Mounting agent routes...")
+    agent_app = agent.get_app()
+    app.mount("/_internal_agent", agent_app)
+
+    print(f"Agent ready at /swml/{{token}}/")
+    print(f"Admin panel at /admin")
+    print(f"Health check at /health")
+
+    yield
+
+    # Shutdown
+    print("Shutting down Personal Assistant AI Agent...")
+
+
 # Initialize FastAPI app
 app = FastAPI(
     title="Personal Assistant AI Agent",
     description="Voice AI Assistant with appointment scheduling, email, and knowledge base",
     version="1.0.0",
+    lifespan=lifespan,
 )
 
 # Initialize templates
 templates = Jinja2Templates(directory="templates")
-
-# Global agent instance
-agent: EthanAgent = None
 
 # Include auth routes
 app.include_router(auth_router)
@@ -72,39 +106,6 @@ async def auth_middleware(request: Request, call_next):
 
     response = await call_next(request)
     return response
-
-
-# ==================== Startup/Shutdown ====================
-
-@app.on_event("startup")
-async def startup_event():
-    """Initialize database and agent on startup"""
-    global agent
-
-    print("Initializing Personal Assistant AI Agent...")
-
-    # Initialize database
-    print("Initializing database...")
-    init_db()
-
-    # Create agent
-    print("Creating agent...")
-    agent = create_agent()
-
-    # Mount agent routes at internal path (accessed via token-validated routes)
-    print("Mounting agent routes...")
-    agent_app = agent.get_app()
-    app.mount("/_internal_agent", agent_app)
-
-    print(f"Agent ready at /swml/{{token}}/")
-    print(f"Admin panel at /admin")
-    print(f"Health check at /health")
-
-
-@app.on_event("shutdown")
-async def shutdown_event():
-    """Cleanup on shutdown"""
-    print("Shutting down Personal Assistant AI Agent...")
 
 
 # ==================== Health Checks ====================

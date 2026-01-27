@@ -54,7 +54,7 @@ KNOWLEDGE_BACKEND = os.getenv("KNOWLEDGE_BACKEND", "sqlite")
 
 # Agent Configuration
 AGENT_NAME = "Assistant"
-AGENT_VOICE = "inworld.Dennis:inworld-tts-1.5-max"
+AGENT_VOICE = "elevenlabs.josh"
 AGENT_LANGUAGE = "en-US"
 AI_MODEL = os.getenv("AI_MODEL", "gpt-oss-120b")
 

@@ -183,6 +183,7 @@ class EthanAgent(AgentBase):
             "inactivity_timeout": config.INACTIVITY_TIMEOUT,
             "ai_model": config.AI_MODEL,
             # "static_greeting": "Your call may be monitored or recorded for quality and training purposes.",
+            "static_greeting_no_barge": True,
         })
 
         # Add speech recognition hints
@@ -194,6 +195,25 @@ class EthanAgent(AgentBase):
             "transfer", "speak to someone", "human",
             "emergency", "urgent",
         ])
+
+        # Add pronunciation rules for TTS (SignalWire uses ${1} syntax for backreferences)
+        # Email usernames: spell out short usernames letter by letter (longest first)
+        # 4-letter: "bkwt@" → "b, k, w, t, at "
+        self.add_pronunciation(r"\b([a-zA-Z])([a-zA-Z])([a-zA-Z])([a-zA-Z])@", "${1}, ${2}, ${3}, ${4}, at ", ignore_case=True)
+        # 3-letter: "bkw@" → "b, k, w, at "
+        self.add_pronunciation(r"\b([a-zA-Z])([a-zA-Z])([a-zA-Z])@", "${1}, ${2}, ${3}, at ", ignore_case=True)
+        # 2-letter: "bk@" → "b, k, at "
+        self.add_pronunciation(r"\b([a-zA-Z])([a-zA-Z])@", "${1}, ${2}, at ", ignore_case=True)
+        # Email addresses with dots: "john.doe" → "john dot doe"
+        self.add_pronunciation(r"(\w)\.(\w)", "${1} dot ${2}", ignore_case=True)
+        # Email at symbol for longer usernames: "@" → " at "
+        self.add_pronunciation(r"@", " at ", ignore_case=True)
+        # Phone numbers: group digits for natural reading
+        # Format: (XXX) XXX-XXXX or XXX-XXX-XXXX
+        self.add_pronunciation(r"\((\d{3})\)\s*(\d{3})-(\d{4})", "${1}. ${2}. ${3}", ignore_case=True)
+        self.add_pronunciation(r"(\d{3})-(\d{3})-(\d{4})", "${1}. ${2}. ${3}", ignore_case=True)
+        # +1XXXXXXXXXX format
+        self.add_pronunciation(r"\+1(\d{3})(\d{3})(\d{4})", "1. ${1}. ${2}. ${3}", ignore_case=True)
 
         # Load configuration from database
         self._load_config()
@@ -1336,10 +1356,10 @@ Return ONLY the JSON object, no other text.
             "- 'What services do you offer?' → CALL get_services tool\n"
             "- General question → CALL search_faqs tool\n\n"
             "MESSAGES:\n"
-            "- 'I'd like to leave a message' → CALL save_message tool\n"
+            "- 'I'd like to leave a message' → Collect name, callback number, message, urgency THEN CALL save_message\n"
             "- 'Can I talk to someone?' → CALL transfer_to_owner tool\n"
             "- 'Email the owner' → CALL email_owner tool\n\n"
-            "ALWAYS call the tool first, then tell them the result."
+            "For messages: ALWAYS collect all details before calling save_message."
         )
         # Main menu includes both customer and owner functions
         # Function filtering per-call removes the wrong mode's functions
@@ -1523,17 +1543,20 @@ Return ONLY the JSON object, no other text.
         message_ctx.add_step("collect_message") \
             .set_text(
                 "A customer wants to LEAVE A MESSAGE for the business owner.\n\n"
-                "STEP BY STEP:\n"
-                "1. Ask for their name (if you don't already have it)\n"
-                "2. Ask for their callback number\n"
-                "3. Ask what message they'd like to leave\n"
-                "4. Ask if it's urgent or can wait\n"
-                "5. CALL save_message tool with the details\n\n"
-                "Be warm and reassure them the owner will get the message."
+                "COLLECT ALL INFO BEFORE SAVING:\n"
+                "1. Ask for their NAME (required)\n"
+                "2. Ask for their CALLBACK NUMBER (required)\n"
+                "3. Ask what MESSAGE they'd like to leave (required)\n"
+                "4. Ask if it's URGENT or can wait (required)\n\n"
+                "VERIFY before saving:\n"
+                "5. Read back: 'So I have [name], callback number [phone], and your message is [message]. Is that correct?'\n"
+                "6. If confirmed, CALL save_message tool with ALL four details\n"
+                "7. If not correct, ask what needs to be changed\n\n"
+                "DO NOT call save_message until you have all 4 pieces of info confirmed."
             ) \
             .set_functions(["save_message"]) \
             .set_valid_steps(["confirm_message"]) \
-            .set_step_criteria("Message details collected")
+            .set_step_criteria("All message details collected and verified")
 
         message_ctx.add_step("confirm_message") \
             .set_text(
@@ -1961,28 +1984,29 @@ Return ONLY the JSON object, no other text.
         # Save Message
         self.define_tool(
             name="save_message",
-            description="Save a message from the caller for the business owner",
+            description="Save a message from the caller for the business owner. IMPORTANT: You MUST collect caller_name, caller_phone, message content, and urgency BEFORE calling this tool. Do not call without all details.",
             parameters={
                 "type": "object",
                 "properties": {
                     "caller_name": {
-                        "type": ["string", "null"],
-                        "description": "The caller's name"
+                        "type": "string",
+                        "description": "The caller's full name (REQUIRED - ask if not known)"
                     },
                     "caller_phone": {
-                        "type": ["string", "null"],
-                        "description": "The caller's phone number for callback"
+                        "type": "string",
+                        "description": "The caller's callback phone number (REQUIRED - ask if not known)"
                     },
                     "message": {
                         "type": "string",
-                        "description": "The message content"
+                        "description": "The message content the caller wants to leave"
                     },
                     "urgency": {
-                        "type": ["string", "null"],
-                        "description": "Message urgency level: 'normal' or 'urgent'"
+                        "type": "string",
+                        "description": "Message urgency: 'normal' or 'urgent' (ask if it's urgent or can wait)",
+                        "enum": ["normal", "urgent"]
                     }
                 },
-                "required": ["message"]
+                "required": ["caller_name", "caller_phone", "message", "urgency"]
             },
             handler=self._save_message,
             fillers={
@@ -2104,10 +2128,6 @@ Return ONLY the JSON object, no other text.
                     "attendee_phone": {
                         "type": ["string", "null"],
                         "description": "Customer's phone number"
-                    },
-                    "notes": {
-                        "type": ["string", "null"],
-                        "description": "Any additional notes or special requests"
                     }
                 },
                 "required": ["start_time", "end_time", "appointment_type", "attendee_name", "attendee_email"]
@@ -3271,7 +3291,6 @@ Return ONLY the JSON object, no other text.
             start_time = args.get("start_time")
             end_time = args.get("end_time")
             appointment_type = args.get("appointment_type", "")
-            notes = args.get("notes", "")
 
             # If no appointment type specified, check if only one exists
             if not appointment_type:
@@ -3341,7 +3360,6 @@ Return ONLY the JSON object, no other text.
                 attendee_name=attendee_name,
                 attendee_email=attendee_email,
                 attendee_phone=attendee_phone,
-                notes=notes,
                 user_id=user_id,
             )
 
@@ -3364,11 +3382,20 @@ Return ONLY the JSON object, no other text.
                 except Exception as email_error:
                     print(f"Failed to send confirmation email: {email_error}")
 
-                return SwaigFunctionResult(
-                    f"I've booked your {appointment_type} appointment for "
-                    f"{result.get('start_time')}. A confirmation has been sent to "
-                    f"{attendee_email}. Is there anything else I can help you with?"
-                )
+                event_id = result.get('event_id', '')
+                if is_owner and event_id:
+                    return SwaigFunctionResult(
+                        f"I've booked your {appointment_type} appointment for "
+                        f"{result.get('start_time')}. A confirmation has been sent to "
+                        f"{attendee_email}. Is there anything else I can help you with? "
+                        f"[EVENT_ID for tool use only: {event_id}]"
+                    )
+                else:
+                    return SwaigFunctionResult(
+                        f"I've booked your {appointment_type} appointment for "
+                        f"{result.get('start_time')}. A confirmation has been sent to "
+                        f"{attendee_email}. Is there anything else I can help you with?"
+                    )
             else:
                 return SwaigFunctionResult(
                     f"I couldn't book the appointment: {result.get('error')}. "
@@ -3476,17 +3503,18 @@ Return ONLY the JSON object, no other text.
                     })
 
             if is_owner_calling:
-                # Owner mode: just list appointments
+                # Owner mode: list appointments with event IDs for tool use
+                event_ids = ",".join([f"{i+1}={a['id']}" for i, a in enumerate(apt_list)])
                 if len(apt_list) == 1:
                     return SwaigFunctionResult(
                         f"You have one upcoming appointment: {apt_list[0]['description']}. "
-                        "Would you like to do anything with it?"
+                        f"Would you like to do anything with it? [EVENT_IDS for tool use only: {event_ids}]"
                     )
                 else:
-                    apt_descriptions = ". ".join([a['description'] for a in apt_list])
+                    apt_descriptions = ". ".join([f"{i+1}. {a['description']}" for i, a in enumerate(apt_list)])
                     return SwaigFunctionResult(
                         f"You have {len(apt_list)} upcoming appointments: {apt_descriptions}. "
-                        "Would you like details on any of these?"
+                        f"Would you like details on any of these? [EVENT_IDS for tool use only: {event_ids}]"
                     )
             else:
                 # Customer mode: offer to cancel
