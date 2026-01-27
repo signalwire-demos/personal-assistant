@@ -1,0 +1,101 @@
+{% extends "auth/base.html" %}
+
+{% block title %}Sign Up - Personal Assistant{% endblock %}
+
+{% block content %}
+<div class="auth-card">
+    <div class="auth-header">
+        <div class="auth-logo">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"></path>
+            </svg>
+        </div>
+        <h1>Create an account</h1>
+        <p>Get started with Personal Assistant</p>
+    </div>
+
+    <div id="alert" class="alert" style="display: none;"></div>
+
+    <form id="signup-form">
+        <div class="form-group">
+            <label class="form-label" for="name">Name</label>
+            <input type="text" id="name" name="name" class="form-input" placeholder="John Doe">
+        </div>
+
+        <div class="form-group">
+            <label class="form-label" for="email">Email</label>
+            <input type="email" id="email" name="email" class="form-input" placeholder="you@example.com" required>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label" for="password">Password</label>
+            <input type="password" id="password" name="password" class="form-input" placeholder="Create a password" required minlength="8">
+            <div class="password-requirements">
+                <ul>
+                    <li>At least 8 characters</li>
+                    <li>At least one letter and one number</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label" for="confirm-password">Confirm Password</label>
+            <input type="password" id="confirm-password" name="confirm-password" class="form-input" placeholder="Confirm your password" required>
+        </div>
+
+        <button type="submit" class="btn btn-primary" id="submit-btn">
+            <span id="btn-text">Create account</span>
+            <div id="btn-spinner" class="spinner" style="display: none;"></div>
+        </button>
+    </form>
+
+    <div class="auth-footer">
+        Already have an account? <a href="/login">Sign in</a>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const form = document.getElementById('signup-form');
+    const submitBtn = document.getElementById('submit-btn');
+    const btnText = document.getElementById('btn-text');
+    const btnSpinner = document.getElementById('btn-spinner');
+
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        clearAlert();
+
+        const name = document.getElementById('name').value;
+        const email = document.getElementById('email').value;
+        const password = document.getElementById('password').value;
+        const confirmPassword = document.getElementById('confirm-password').value;
+
+        // Validate passwords match
+        if (password !== confirmPassword) {
+            showError('Passwords do not match');
+            return;
+        }
+
+        // Disable button and show spinner
+        submitBtn.disabled = true;
+        btnText.style.display = 'none';
+        btnSpinner.style.display = 'block';
+
+        try {
+            const result = await api('/auth/signup', {
+                method: 'POST',
+                body: JSON.stringify({ name, email, password }),
+            });
+
+            // Redirect to admin on success
+            window.location.href = '/admin';
+        } catch (error) {
+            showError(error.message);
+            submitBtn.disabled = false;
+            btnText.style.display = 'block';
+            btnSpinner.style.display = 'none';
+        }
+    });
+</script>
+{% endblock %}

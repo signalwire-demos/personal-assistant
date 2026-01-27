@@ -1,0 +1,289 @@
+{% extends "admin/base.html" %}
+
+{% block title %}Integrations{% endblock %}
+{% block page_title %}Integrations{% endblock %}
+
+{% block content %}
+<div class="grid grid-2">
+    <div class="card">
+        <div class="card-header">
+            <h3>Google Calendar & Gmail</h3>
+        </div>
+        <div class="card-body" id="google-status">
+            <div class="loading"><div class="spinner"></div></div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h3>Knowledge Base</h3>
+        </div>
+        <div class="card-body" id="kb-status">
+            <div class="loading"><div class="spinner"></div></div>
+        </div>
+    </div>
+</div>
+
+<div class="card" style="margin-top: 1.5rem;">
+    <div class="card-header">
+        <h3>SignalWire Configuration</h3>
+    </div>
+    <div class="card-body">
+        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem;">
+            <div style="padding: 1rem; background: #f8fafc; border-radius: 6px;">
+                <div style="font-size: 0.8125rem; color: #64748b; margin-bottom: 0.25rem;">SWML Webhook URL</div>
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    <code style="font-size: 0.875rem; word-break: break-all; flex: 1;" id="swml-url">Loading...</code>
+                    <button class="btn btn-secondary btn-sm" onclick="copySwmlUrl()" title="Copy to clipboard">
+                        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
+                    </button>
+                    <button class="btn btn-secondary btn-sm" onclick="regenerateSwmlToken()" title="Regenerate URL">
+                        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                    </button>
+                </div>
+            </div>
+            <div style="padding: 1rem; background: #f8fafc; border-radius: 6px;">
+                <div style="font-size: 0.8125rem; color: #64748b; margin-bottom: 0.25rem;">Agent Status</div>
+                <div id="agent-status" style="display: flex; align-items: center; gap: 0.5rem;">
+                    <span class="badge badge-green">Online</span>
+                </div>
+            </div>
+        </div>
+        <div style="margin-top: 1rem; padding: 1rem; background: #fef3c7; border-radius: 6px; font-size: 0.875rem;">
+            <strong>Setup Instructions:</strong>
+            <ol style="margin: 0.5rem 0 0 1.25rem; color: #92400e;">
+                <li>Copy the SWML Webhook URL above</li>
+                <li>In your SignalWire Space, create a new phone number</li>
+                <li>Set the phone number's SWML URL to the webhook URL</li>
+                <li>Calls to that number will now be handled by your AI assistant</li>
+            </ol>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    let googlePopup = null;
+
+    async function loadGoogleStatus() {
+        const container = document.getElementById('google-status');
+        try {
+            const status = await api('/api/google/status');
+
+            if (status.connected) {
+                container.innerHTML = `
+                    <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem;">
+                        <div style="width: 48px; height: 48px; background: #dcfce7; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+                            <svg width="24" height="24" fill="none" stroke="#16a34a" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                        </div>
+                        <div>
+                            <div style="font-weight: 600; color: #16a34a;">Connected</div>
+                            <div style="font-size: 0.875rem; color: #64748b;">${status.email || 'Email not available'}</div>
+                        </div>
+                    </div>
+                    <div style="background: #f8fafc; padding: 1rem; border-radius: 6px; margin-bottom: 1rem;">
+                        <div style="font-size: 0.8125rem; color: #64748b; margin-bottom: 0.5rem;">Enabled Features</div>
+                        <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
+                            <span class="badge badge-green">Calendar</span>
+                            <span class="badge badge-green">Send Email</span>
+                            <span class="badge badge-green">Read Email</span>
+                            <span class="badge badge-green">Contacts</span>
+                        </div>
+                    </div>
+                    <div style="background: #f8fafc; padding: 1rem; border-radius: 6px; margin-bottom: 1rem;">
+                        <div style="font-size: 0.8125rem; color: #64748b; margin-bottom: 0.5rem;">Calendar</div>
+                        <select class="form-select" id="calendar-select" onchange="setCalendar(this.value)" style="width: 100%;">
+                            <option value="">Loading calendars...</option>
+                        </select>
+                    </div>
+                    <div style="background: #f8fafc; padding: 1rem; border-radius: 6px; margin-bottom: 1rem;">
+                        <div style="font-size: 0.8125rem; color: #64748b; margin-bottom: 0.5rem;">Email Account</div>
+                        <div style="font-size: 0.875rem; font-weight: 500;">${status.email || 'Email not available'}</div>
+                    </div>
+                    <button class="btn btn-danger" onclick="disconnectGoogle()">Disconnect Google Account</button>
+                `;
+                // Load calendars after rendering
+                loadCalendars();
+            } else {
+                container.innerHTML = `
+                    <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem;">
+                        <div style="width: 48px; height: 48px; background: #fef3c7; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+                            <svg width="24" height="24" fill="none" stroke="#d97706" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+                        </div>
+                        <div>
+                            <div style="font-weight: 600; color: #d97706;">Not Connected</div>
+                            <div style="font-size: 0.875rem; color: #64748b;">Connect to enable calendar, email, and contacts</div>
+                        </div>
+                    </div>
+                    ${status.configured ? `
+                        <button class="btn btn-primary" onclick="connectGoogle()">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+                            Connect Google Account
+                        </button>
+                    ` : `
+                        <div class="alert alert-warning">
+                            Google OAuth is not configured. Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in your environment.
+                        </div>
+                    `}
+                `;
+            }
+        } catch (error) {
+            container.innerHTML = '<div class="alert alert-error">Error loading Google status</div>';
+        }
+    }
+
+    async function loadKbStatus() {
+        const container = document.getElementById('kb-status');
+        try {
+            const status = await api('/api/knowledge/status');
+
+            container.innerHTML = `
+                <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem;">
+                    <div style="width: 48px; height: 48px; background: ${status.index_exists ? '#dcfce7' : '#fef3c7'}; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+                        <svg width="24" height="24" fill="none" stroke="${status.index_exists ? '#16a34a' : '#d97706'}" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path></svg>
+                    </div>
+                    <div>
+                        <div style="font-weight: 600; color: ${status.index_exists ? '#16a34a' : '#d97706'};">
+                            ${status.index_exists ? 'Index Ready' : 'Index Not Built'}
+                        </div>
+                        <div style="font-size: 0.875rem; color: #64748b;">
+                            ${status.total_documents} documents
+                        </div>
+                    </div>
+                </div>
+                <div style="background: #f8fafc; padding: 1rem; border-radius: 6px; margin-bottom: 1rem;">
+                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; text-align: center;">
+                        <div>
+                            <div style="font-size: 1.25rem; font-weight: 600;">${status.total_documents}</div>
+                            <div style="font-size: 0.75rem; color: #64748b;">Total</div>
+                        </div>
+                        <div>
+                            <div style="font-size: 1.25rem; font-weight: 600;">${status.indexed_documents}</div>
+                            <div style="font-size: 0.75rem; color: #64748b;">Indexed</div>
+                        </div>
+                        <div>
+                            <div style="font-size: 1.25rem; font-weight: 600;">${status.pending_documents}</div>
+                            <div style="font-size: 0.75rem; color: #64748b;">Pending</div>
+                        </div>
+                    </div>
+                </div>
+                <a href="/admin/knowledge" class="btn btn-secondary">Manage Knowledge Base</a>
+            `;
+        } catch (error) {
+            container.innerHTML = '<div class="alert alert-error">Error loading knowledge base status</div>';
+        }
+    }
+
+    async function connectGoogle() {
+        try {
+            const data = await api('/api/google/connect');
+
+            // Open popup for OAuth
+            googlePopup = window.open(
+                data.authorization_url,
+                'Google OAuth',
+                'width=500,height=600,menubar=no,toolbar=no'
+            );
+
+            // Listen for completion message
+            window.addEventListener('message', (event) => {
+                if (event.data.type === 'google_connected') {
+                    if (googlePopup) googlePopup.close();
+                    showToast('Google account connected successfully');
+                    loadGoogleStatus();
+                }
+            });
+        } catch (error) {
+            showToast('Error connecting Google: ' + error.message, 'error');
+        }
+    }
+
+    async function disconnectGoogle() {
+        if (!confirm('Are you sure you want to disconnect your Google account?')) return;
+
+        try {
+            await api('/api/google/disconnect', { method: 'POST' });
+            showToast('Google account disconnected');
+            loadGoogleStatus();
+        } catch (error) {
+            showToast('Error disconnecting Google', 'error');
+        }
+    }
+
+    async function loadCalendars() {
+        const select = document.getElementById('calendar-select');
+        if (!select) return;
+
+        try {
+            const data = await api('/api/google/calendars');
+            select.innerHTML = data.calendars.map(cal => `
+                <option value="${cal.id}" ${cal.id === data.selected ? 'selected' : ''}>
+                    ${cal.name}${cal.primary ? ' (Primary)' : ''}
+                </option>
+            `).join('');
+        } catch (error) {
+            select.innerHTML = '<option value="primary">Primary Calendar</option>';
+        }
+    }
+
+    async function setCalendar(calendarId) {
+        try {
+            await api('/api/google/calendars', {
+                method: 'POST',
+                body: JSON.stringify({ calendar_id: calendarId })
+            });
+            showToast('Calendar updated');
+        } catch (error) {
+            showToast('Error updating calendar', 'error');
+        }
+    }
+
+    // Load SWML URL with auth
+    let swmlUrl = '';
+    async function loadSwmlUrl() {
+        try {
+            const data = await api('/api/swml-url');
+            swmlUrl = data.url;
+            document.getElementById('swml-url').textContent = swmlUrl;
+        } catch (error) {
+            document.getElementById('swml-url').textContent = window.location.origin + '/swml';
+            swmlUrl = window.location.origin + '/swml';
+        }
+    }
+
+    function copySwmlUrl() {
+        navigator.clipboard.writeText(swmlUrl).then(() => {
+            showToast('URL copied to clipboard');
+        }).catch(() => {
+            // Fallback for older browsers
+            const textarea = document.createElement('textarea');
+            textarea.value = swmlUrl;
+            document.body.appendChild(textarea);
+            textarea.select();
+            document.execCommand('copy');
+            document.body.removeChild(textarea);
+            showToast('URL copied to clipboard');
+        });
+    }
+
+    async function regenerateSwmlToken() {
+        if (!confirm('Are you sure you want to regenerate your SWML URL?\n\nThis will invalidate your current URL. You will need to update your SignalWire webhook configuration with the new URL.')) {
+            return;
+        }
+
+        try {
+            const data = await api('/api/swml-token/regenerate', { method: 'POST' });
+            swmlUrl = data.url;
+            document.getElementById('swml-url').textContent = swmlUrl;
+            showToast('SWML URL regenerated. Update your SignalWire webhook.');
+        } catch (error) {
+            showToast('Error regenerating URL: ' + error.message, 'error');
+        }
+    }
+
+    loadSwmlUrl();
+    loadGoogleStatus();
+    loadKbStatus();
+</script>
+{% endblock %}

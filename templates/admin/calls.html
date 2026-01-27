@@ -1,0 +1,207 @@
+{% extends "admin/base.html" %}
+
+{% block title %}Call History{% endblock %}
+{% block page_title %}Call History{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h3>Recent Calls</h3>
+        <div style="display: flex; gap: 0.5rem; align-items: center;">
+            <select id="outcome-filter" class="form-select" style="width: auto;" onchange="loadCalls()">
+                <option value="">All Outcomes</option>
+                <option value="appointment_booked">Appointment Booked</option>
+                <option value="appointment_cancelled">Appointment Cancelled</option>
+                <option value="message_left">Message Left</option>
+                <option value="info_provided">Info Provided</option>
+                <option value="transfer">Transfer</option>
+                <option value="hangup">Hangup</option>
+            </select>
+            <button class="btn btn-secondary" onclick="loadCalls()">
+                <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                Refresh
+            </button>
+        </div>
+    </div>
+    <div class="card-body" style="padding: 0;">
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Date/Time</th>
+                        <th>Caller</th>
+                        <th>Outcome</th>
+                        <th>Summary</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="calls-table">
+                    <tr><td colspan="5" class="loading"><div class="spinner"></div></td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Call Details Modal -->
+<div class="modal-overlay" id="call-modal">
+    <div class="modal" style="max-width: 600px;">
+        <div class="modal-header">
+            <h3>Call Details</h3>
+            <button class="modal-close" onclick="closeModal('call-modal')">&times;</button>
+        </div>
+        <div class="modal-body" id="call-details">
+            <!-- Populated by JS -->
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeModal('call-modal')">Close</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    let allCalls = [];
+
+    function getOutcomeBadge(outcome) {
+        const badges = {
+            'appointment_booked': '<span class="badge badge-green">Appointment Booked</span>',
+            'appointment_cancelled': '<span class="badge badge-yellow">Cancelled</span>',
+            'message_left': '<span class="badge badge-blue">Message Left</span>',
+            'info_provided': '<span class="badge badge-gray">Info Provided</span>',
+            'transfer': '<span class="badge badge-purple">Transfer</span>',
+            'hangup': '<span class="badge badge-gray">Hangup</span>',
+            'unknown': '<span class="badge badge-gray">Unknown</span>'
+        };
+        return badges[outcome] || `<span class="badge badge-gray">${outcome || 'Unknown'}</span>`;
+    }
+
+    function formatDuration(seconds) {
+        if (!seconds) return '-';
+        const mins = Math.floor(seconds / 60);
+        const secs = seconds % 60;
+        return mins > 0 ? `${mins}m ${secs}s` : `${secs}s`;
+    }
+
+    function formatDateTime(isoString) {
+        if (!isoString) return '-';
+        const date = new Date(isoString);
+        return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+    }
+
+    async function loadCalls() {
+        const tbody = document.getElementById('calls-table');
+        tbody.innerHTML = '<tr><td colspan="5" class="loading"><div class="spinner"></div></td></tr>';
+
+        try {
+            allCalls = await api('/api/call-logs?limit=100');
+            renderCalls();
+        } catch (error) {
+            tbody.innerHTML = '<tr><td colspan="5" class="empty-state">Error loading calls</td></tr>';
+        }
+    }
+
+    function renderCalls() {
+        const tbody = document.getElementById('calls-table');
+        const filter = document.getElementById('outcome-filter').value;
+
+        let filtered = allCalls;
+        if (filter) {
+            filtered = allCalls.filter(c => c.outcome === filter);
+        }
+
+        if (filtered.length === 0) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="5">
+                        <div class="empty-state">
+                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"></path></svg>
+                            <h4>No calls found</h4>
+                            <p>${filter ? 'No calls match this filter' : 'Call history will appear here after calls are completed'}</p>
+                        </div>
+                    </td>
+                </tr>
+            `;
+            return;
+        }
+
+        tbody.innerHTML = filtered.map(call => `
+            <tr>
+                <td style="white-space: nowrap;">
+                    <div>${formatDateTime(call.created_at)}</div>
+                    ${call.duration_seconds ? `<small style="color: #64748b;">${formatDuration(call.duration_seconds)}</small>` : ''}
+                </td>
+                <td>
+                    <strong>${call.caller_name || 'Unknown'}</strong>
+                    ${call.caller_number ? `<div style="font-size: 0.8125rem; color: #64748b;">${call.caller_number}</div>` : ''}
+                </td>
+                <td>${getOutcomeBadge(call.outcome)}</td>
+                <td style="max-width: 300px;">
+                    <div style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                        ${call.summary ? call.summary.split('\n')[0].substring(0, 80) + (call.summary.length > 80 ? '...' : '') : '<span style="color: #94a3b8;">No summary</span>'}
+                    </div>
+                </td>
+                <td>
+                    <button class="btn btn-secondary btn-sm" onclick="viewCall('${call.call_id}')">View</button>
+                </td>
+            </tr>
+        `).join('');
+    }
+
+    function viewCall(callId) {
+        const call = allCalls.find(c => c.call_id === callId);
+        if (!call) return;
+
+        const details = document.getElementById('call-details');
+        details.innerHTML = `
+            <div style="display: grid; gap: 1rem;">
+                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem;">
+                    <div style="background: #f8fafc; padding: 1rem; border-radius: 6px;">
+                        <div style="font-size: 0.75rem; color: #64748b; margin-bottom: 0.25rem;">Caller</div>
+                        <div style="font-weight: 500;">${call.caller_name || 'Unknown'}</div>
+                        <div style="font-size: 0.875rem; color: #64748b;">${call.caller_number || 'No number'}</div>
+                    </div>
+                    <div style="background: #f8fafc; padding: 1rem; border-radius: 6px;">
+                        <div style="font-size: 0.75rem; color: #64748b; margin-bottom: 0.25rem;">Date/Time</div>
+                        <div style="font-weight: 500;">${formatDateTime(call.created_at)}</div>
+                        ${call.duration_seconds ? `<div style="font-size: 0.875rem; color: #64748b;">Duration: ${formatDuration(call.duration_seconds)}</div>` : ''}
+                    </div>
+                </div>
+                <div style="background: #f8fafc; padding: 1rem; border-radius: 6px;">
+                    <div style="font-size: 0.75rem; color: #64748b; margin-bottom: 0.25rem;">Outcome</div>
+                    ${getOutcomeBadge(call.outcome)}
+                </div>
+                <div style="background: #f8fafc; padding: 1rem; border-radius: 6px;">
+                    <div style="font-size: 0.75rem; color: #64748b; margin-bottom: 0.25rem;">Summary</div>
+                    <div style="white-space: pre-wrap; font-size: 0.875rem;">${call.summary || 'No summary available'}</div>
+                </div>
+                ${call.transcript ? `
+                <div style="background: #f8fafc; padding: 1rem; border-radius: 6px;">
+                    <div style="font-size: 0.75rem; color: #64748b; margin-bottom: 0.25rem;">Transcript</div>
+                    <div style="white-space: pre-wrap; font-size: 0.8125rem; max-height: 200px; overflow-y: auto;">${call.transcript}</div>
+                </div>
+                ` : ''}
+                ${call.recording_url ? `
+                <div style="background: #f8fafc; padding: 1rem; border-radius: 6px;">
+                    <div style="font-size: 0.75rem; color: #64748b; margin-bottom: 0.5rem;">Recording</div>
+                    <audio controls style="width: 100%;">
+                        <source src="${call.recording_url}" type="audio/mpeg">
+                        Your browser does not support audio playback.
+                    </audio>
+                </div>
+                ` : ''}
+                <div style="font-size: 0.75rem; color: #94a3b8;">
+                    Call ID: ${call.call_id}
+                </div>
+            </div>
+        `;
+        openModal('call-modal');
+    }
+
+    loadCalls();
+
+    // Auto-refresh every 30 seconds
+    setInterval(loadCalls, 30000);
+</script>
+{% endblock %}

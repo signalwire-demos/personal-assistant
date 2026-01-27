@@ -1,0 +1,179 @@
+{% extends "admin/base.html" %}
+
+{% block title %}Messages{% endblock %}
+{% block page_title %}Messages{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h3>All Messages</h3>
+        <div style="display: flex; gap: 0.5rem;">
+            <select class="form-select" id="filter-status" style="width: auto;">
+                <option value="">All Status</option>
+                <option value="unread">Unread</option>
+                <option value="read">Read</option>
+            </select>
+        </div>
+    </div>
+    <div class="card-body" style="padding: 0;">
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Caller</th>
+                        <th>Phone</th>
+                        <th>Message</th>
+                        <th>Urgency</th>
+                        <th>Status</th>
+                        <th>Date</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="messages-table">
+                    <tr><td colspan="7" class="loading"><div class="spinner"></div></td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Message Modal -->
+<div class="modal-overlay" id="message-modal">
+    <div class="modal">
+        <div class="modal-header">
+            <h3>Message Details</h3>
+            <button class="modal-close" onclick="closeModal('message-modal')">&times;</button>
+        </div>
+        <div class="modal-body" id="message-detail">
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeModal('message-modal')">Close</button>
+            <button class="btn btn-success" id="mark-read-btn">Mark as Read</button>
+            <button class="btn btn-danger" id="delete-btn">Delete</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    let currentMessageId = null;
+
+    async function loadMessages() {
+        const status = document.getElementById('filter-status').value;
+        const url = status ? `/api/messages?status=${status}` : '/api/messages';
+
+        try {
+            const messages = await api(url);
+            const tbody = document.getElementById('messages-table');
+
+            if (messages.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="7">
+                            <div class="empty-state">
+                                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
+                                <h4>No messages</h4>
+                                <p>Messages from callers will appear here</p>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            tbody.innerHTML = messages.map(msg => `
+                <tr style="${msg.status === 'unread' ? 'background: #f0f9ff;' : ''}">
+                    <td><strong>${msg.caller_name || 'Unknown'}</strong></td>
+                    <td>${msg.caller_phone || '-'}</td>
+                    <td style="max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                        ${msg.message.substring(0, 80)}${msg.message.length > 80 ? '...' : ''}
+                    </td>
+                    <td>
+                        <span class="badge ${msg.urgency === 'urgent' ? 'badge-red' : 'badge-gray'}">
+                            ${msg.urgency || 'normal'}
+                        </span>
+                    </td>
+                    <td>
+                        <span class="badge ${msg.status === 'unread' ? 'badge-blue' : 'badge-gray'}">
+                            ${msg.status}
+                        </span>
+                    </td>
+                    <td style="white-space: nowrap;">${new Date(msg.created_at).toLocaleString()}</td>
+                    <td>
+                        <button class="btn btn-secondary btn-sm" onclick="viewMessage(${msg.id})">View</button>
+                    </td>
+                </tr>
+            `).join('');
+        } catch (error) {
+            document.getElementById('messages-table').innerHTML = `
+                <tr><td colspan="7" class="empty-state">Error loading messages</td></tr>
+            `;
+        }
+    }
+
+    async function viewMessage(id) {
+        currentMessageId = id;
+        try {
+            const messages = await api('/api/messages');
+            const msg = messages.find(m => m.id === id);
+
+            if (!msg) {
+                showToast('Message not found', 'error');
+                return;
+            }
+
+            document.getElementById('message-detail').innerHTML = `
+                <div style="margin-bottom: 1rem;">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                        <strong style="font-size: 1.125rem;">${msg.caller_name || 'Unknown Caller'}</strong>
+                        <span class="badge ${msg.urgency === 'urgent' ? 'badge-red' : 'badge-gray'}">${msg.urgency || 'normal'}</span>
+                    </div>
+                    <div style="color: #64748b; font-size: 0.875rem;">
+                        ${msg.caller_phone || 'No phone'} &bull; ${new Date(msg.created_at).toLocaleString()}
+                    </div>
+                </div>
+                <div style="background: #f8fafc; padding: 1rem; border-radius: 6px; white-space: pre-wrap;">
+                    ${msg.message}
+                </div>
+            `;
+
+            document.getElementById('mark-read-btn').style.display = msg.status === 'unread' ? 'inline-flex' : 'none';
+
+            openModal('message-modal');
+        } catch (error) {
+            showToast('Error loading message', 'error');
+        }
+    }
+
+    document.getElementById('mark-read-btn').addEventListener('click', async () => {
+        if (!currentMessageId) return;
+        try {
+            await api(`/api/messages/${currentMessageId}/read`, { method: 'POST' });
+            showToast('Message marked as read');
+            closeModal('message-modal');
+            loadMessages();
+        } catch (error) {
+            showToast('Error updating message', 'error');
+        }
+    });
+
+    document.getElementById('delete-btn').addEventListener('click', async () => {
+        if (!currentMessageId) return;
+        if (!confirm('Are you sure you want to delete this message?')) return;
+
+        try {
+            await api(`/api/messages/${currentMessageId}`, { method: 'DELETE' });
+            showToast('Message deleted');
+            closeModal('message-modal');
+            loadMessages();
+        } catch (error) {
+            showToast('Error deleting message', 'error');
+        }
+    });
+
+    document.getElementById('filter-status').addEventListener('change', loadMessages);
+
+    loadMessages();
+</script>
+{% endblock %}

@@ -1,0 +1,204 @@
+{% extends "admin/base.html" %}
+
+{% block title %}Settings{% endblock %}
+{% block page_title %}Settings{% endblock %}
+
+{% block content %}
+<div class="grid grid-2">
+    <div class="card">
+        <div class="card-header">
+            <h3>Business Information</h3>
+        </div>
+        <div class="card-body">
+            <form id="business-form">
+                <div class="form-group">
+                    <label class="form-label">Business Name</label>
+                    <input type="text" class="form-input" name="business_name" id="business_name">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Business Phone</label>
+                    <input type="tel" class="form-input" name="business_phone" id="business_phone">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Business Email</label>
+                    <input type="email" class="form-input" name="business_email" id="business_email">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Business Address</label>
+                    <textarea class="form-textarea" name="business_address" id="business_address" rows="2"></textarea>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Timezone</label>
+                    <select class="form-select" name="timezone" id="timezone">
+                        <option value="America/New_York">Eastern Time</option>
+                        <option value="America/Chicago">Central Time</option>
+                        <option value="America/Denver">Mountain Time</option>
+                        <option value="America/Los_Angeles">Pacific Time</option>
+                        <option value="America/Anchorage">Alaska Time</option>
+                        <option value="Pacific/Honolulu">Hawaii Time</option>
+                    </select>
+                </div>
+                <button type="submit" class="btn btn-primary">Save Changes</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h3>Owner Contact</h3>
+        </div>
+        <div class="card-body">
+            <form id="owner-form">
+                <div class="form-group">
+                    <label class="form-label">Owner Email</label>
+                    <input type="email" class="form-input" name="owner_email" id="owner_email">
+                    <div class="form-hint">Notifications and messages will be sent here</div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Owner Phone</label>
+                    <input type="tel" class="form-input" name="owner_phone" id="owner_phone">
+                    <div class="form-hint">For call transfers</div>
+                </div>
+                <button type="submit" class="btn btn-primary">Save Changes</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h3>AI Agent Settings</h3>
+        </div>
+        <div class="card-body">
+            <form id="agent-form">
+                <div class="form-group">
+                    <label class="form-label">Agent Name</label>
+                    <input type="text" class="form-input" name="agent_name" id="agent_name">
+                    <div class="form-hint">The name the AI will use to identify itself</div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Custom Greeting</label>
+                    <textarea class="form-textarea" name="greeting_message" id="greeting_message" rows="3" placeholder="Leave blank for default greeting"></textarea>
+                    <div class="form-hint">Optional custom greeting prompt for the AI</div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">After Hours Message</label>
+                    <textarea class="form-textarea" name="after_hours_message" id="after_hours_message" rows="3" placeholder="Leave blank for default message"></textarea>
+                    <div class="form-hint">Prompt for the AI when business is closed</div>
+                </div>
+                <div style="background: #f8fafc; padding: 1rem; border-radius: 6px; margin-bottom: 1rem;">
+                    <div style="font-size: 0.8125rem; font-weight: 600; color: #475569; margin-bottom: 0.5rem;">Available Template Variables</div>
+                    <div style="font-size: 0.75rem; color: #64748b; font-family: monospace; display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.25rem;">
+                        <span>{business_name}</span>
+                        <span>{agent_name}</span>
+                        <span>{business_phone}</span>
+                        <span>{business_email}</span>
+                        <span>{business_address}</span>
+                        <span>{owner_phone}</span>
+                        <span>{timezone}</span>
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-primary">Save Changes</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h3>System Information</h3>
+        </div>
+        <div class="card-body">
+            <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+                <div style="display: flex; justify-content: space-between; padding: 0.5rem 0; border-bottom: 1px solid #e2e8f0;">
+                    <span style="color: #64748b;">Agent Version</span>
+                    <span>1.0.0</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; padding: 0.5rem 0; border-bottom: 1px solid #e2e8f0;">
+                    <span style="color: #64748b;">Database</span>
+                    <span>SQLite</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; padding: 0.5rem 0; border-bottom: 1px solid #e2e8f0;">
+                    <span style="color: #64748b;">Knowledge Base</span>
+                    <span id="kb-status">Loading...</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; padding: 0.5rem 0;">
+                    <span style="color: #64748b;">Google Integration</span>
+                    <span id="google-status">Loading...</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    // Load current config
+    async function loadConfig() {
+        try {
+            const config = await api('/api/config');
+
+            document.getElementById('business_name').value = config.business_name || '';
+            document.getElementById('business_phone').value = config.business_phone || '';
+            document.getElementById('business_email').value = config.business_email || '';
+            document.getElementById('business_address').value = config.business_address || '';
+            document.getElementById('timezone').value = config.timezone || 'America/Los_Angeles';
+            document.getElementById('owner_email').value = config.owner_email || '';
+            document.getElementById('owner_phone').value = config.owner_phone || '';
+            document.getElementById('agent_name').value = config.agent_name || 'Assistant';
+            document.getElementById('greeting_message').value = config.greeting_message || '';
+            document.getElementById('after_hours_message').value = config.after_hours_message || '';
+        } catch (error) {
+            showToast('Error loading settings', 'error');
+        }
+    }
+
+    // Load system status
+    async function loadStatus() {
+        try {
+            const google = await api('/api/google/status');
+            document.getElementById('google-status').textContent = google.connected ? 'Connected' : 'Not Connected';
+            document.getElementById('google-status').style.color = google.connected ? '#059669' : '#d97706';
+        } catch (e) {
+            document.getElementById('google-status').textContent = 'Error';
+        }
+
+        try {
+            const kb = await api('/api/knowledge/status');
+            document.getElementById('kb-status').textContent = kb.index_exists ? `${kb.total_documents} docs indexed` : 'Not indexed';
+            document.getElementById('kb-status').style.color = kb.index_exists ? '#059669' : '#d97706';
+        } catch (e) {
+            document.getElementById('kb-status').textContent = 'Error';
+        }
+    }
+
+    // Save form helper
+    async function saveForm(formId, fields) {
+        const form = document.getElementById(formId);
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const data = {};
+            fields.forEach(field => {
+                data[field] = document.getElementById(field).value;
+            });
+
+            try {
+                await api('/api/config', {
+                    method: 'POST',
+                    body: JSON.stringify(data)
+                });
+                showToast('Settings saved successfully');
+            } catch (error) {
+                showToast('Error saving settings', 'error');
+            }
+        });
+    }
+
+    // Initialize
+    loadConfig();
+    loadStatus();
+
+    saveForm('business-form', ['business_name', 'business_phone', 'business_email', 'business_address', 'timezone']);
+    saveForm('owner-form', ['owner_email', 'owner_phone']);
+    saveForm('agent-form', ['agent_name', 'greeting_message', 'after_hours_message']);
+</script>
+{% endblock %}

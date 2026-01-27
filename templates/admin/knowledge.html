@@ -1,0 +1,355 @@
+{% extends "admin/base.html" %}
+
+{% block title %}Knowledge Base{% endblock %}
+{% block page_title %}Knowledge Base{% endblock %}
+
+{% block content %}
+<div class="grid grid-4" style="margin-bottom: 1.5rem;">
+    <div class="stat-card">
+        <div class="label">Total Documents</div>
+        <div class="value" id="total-docs">-</div>
+    </div>
+    <div class="stat-card">
+        <div class="label">Indexed</div>
+        <div class="value" id="indexed-docs">-</div>
+    </div>
+    <div class="stat-card">
+        <div class="label">Pending</div>
+        <div class="value" id="pending-docs">-</div>
+    </div>
+    <div class="stat-card">
+        <div class="label">Index Status</div>
+        <div class="value" id="index-status" style="font-size: 1rem;">-</div>
+    </div>
+</div>
+
+<div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+        <h3>Index Management</h3>
+        <div style="display: flex; gap: 0.5rem;">
+            <button class="btn btn-secondary" onclick="openModal('search-modal')">
+                <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                Test Search
+            </button>
+            <button class="btn btn-primary" id="build-index-btn">
+                <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                Rebuild Index
+            </button>
+        </div>
+    </div>
+    <div class="card-body">
+        <div id="index-info" style="color: #64748b; font-size: 0.875rem;">Loading...</div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h3>Documents</h3>
+        <div style="display: flex; gap: 0.5rem;">
+            <select class="form-select" id="filter-category" style="width: auto;">
+                <option value="">All Categories</option>
+            </select>
+            <button class="btn btn-primary" onclick="openModal('add-modal')">
+                <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+                Add Document
+            </button>
+        </div>
+    </div>
+    <div class="card-body" style="padding: 0;">
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Title</th>
+                        <th>Category</th>
+                        <th>Tags</th>
+                        <th>Indexed</th>
+                        <th>Updated</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="documents-table">
+                    <tr><td colspan="6" class="loading"><div class="spinner"></div></td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Add/Edit Document Modal -->
+<div class="modal-overlay" id="add-modal">
+    <div class="modal" style="max-width: 600px;">
+        <div class="modal-header">
+            <h3 id="modal-title">Add Document</h3>
+            <button class="modal-close" onclick="closeModal('add-modal')">&times;</button>
+        </div>
+        <div class="modal-body">
+            <form id="document-form">
+                <input type="hidden" id="doc-id">
+                <div class="form-group">
+                    <label class="form-label">Title *</label>
+                    <input type="text" class="form-input" id="doc-title" required>
+                </div>
+                <div class="grid grid-2">
+                    <div class="form-group">
+                        <label class="form-label">Category</label>
+                        <input type="text" class="form-input" id="doc-category" placeholder="e.g., policies, products">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Tags</label>
+                        <input type="text" class="form-input" id="doc-tags" placeholder="comma-separated">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Content *</label>
+                    <textarea class="form-textarea" id="doc-content" rows="10" required placeholder="Markdown supported"></textarea>
+                </div>
+            </form>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeModal('add-modal')">Cancel</button>
+            <button class="btn btn-primary" onclick="saveDocument()">Save Document</button>
+        </div>
+    </div>
+</div>
+
+<!-- Test Search Modal -->
+<div class="modal-overlay" id="search-modal">
+    <div class="modal" style="max-width: 600px;">
+        <div class="modal-header">
+            <h3>Test Knowledge Search</h3>
+            <button class="modal-close" onclick="closeModal('search-modal')">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="form-group">
+                <label class="form-label">Search Query</label>
+                <input type="text" class="form-input" id="search-query" placeholder="Enter a question...">
+            </div>
+            <button class="btn btn-primary" onclick="testSearch()" style="width: 100%;">Search</button>
+            <div id="search-results" style="margin-top: 1rem;"></div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    async function loadStatus() {
+        try {
+            const status = await api('/api/knowledge/status');
+
+            document.getElementById('total-docs').textContent = status.total_documents;
+            document.getElementById('indexed-docs').textContent = status.indexed_documents;
+            document.getElementById('pending-docs').textContent = status.pending_documents;
+            document.getElementById('index-status').textContent = status.index_exists ? 'Ready' : 'Not Built';
+            document.getElementById('index-status').style.color = status.index_exists ? '#059669' : '#d97706';
+
+            let info = '';
+            if (status.index_exists) {
+                info = `Index last built: ${new Date(status.index_modified).toLocaleString()} (${(status.index_size_bytes / 1024).toFixed(1)} KB)`;
+            } else {
+                info = 'No index exists. Click "Rebuild Index" to create one.';
+            }
+            if (status.needs_rebuild) {
+                info += ' <span style="color: #d97706;">(Rebuild recommended - documents changed)</span>';
+            }
+            document.getElementById('index-info').innerHTML = info;
+        } catch (error) {
+            console.error('Error loading status:', error);
+        }
+    }
+
+    async function loadCategories() {
+        try {
+            const categories = await api('/api/knowledge/categories');
+            const select = document.getElementById('filter-category');
+            categories.forEach(cat => {
+                const option = document.createElement('option');
+                option.value = cat;
+                option.textContent = cat;
+                select.appendChild(option);
+            });
+        } catch (error) {
+            console.error('Error loading categories:', error);
+        }
+    }
+
+    async function loadDocuments() {
+        const category = document.getElementById('filter-category').value;
+        const url = category ? `/api/knowledge/documents?category=${category}` : '/api/knowledge/documents';
+
+        try {
+            const docs = await api(url);
+            const tbody = document.getElementById('documents-table');
+
+            if (docs.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="6">
+                            <div class="empty-state">
+                                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                                <h4>No documents</h4>
+                                <p>Add documents to build your knowledge base</p>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            tbody.innerHTML = docs.map(doc => `
+                <tr>
+                    <td><strong>${doc.title}</strong></td>
+                    <td><span class="badge badge-blue">${doc.category || 'general'}</span></td>
+                    <td>${(doc.tags || []).map(t => `<span class="badge badge-gray" style="margin-right: 0.25rem;">${t}</span>`).join('')}</td>
+                    <td>
+                        <span class="badge ${doc.is_indexed ? 'badge-green' : 'badge-yellow'}">
+                            ${doc.is_indexed ? 'Yes' : 'No'}
+                        </span>
+                    </td>
+                    <td style="white-space: nowrap;">${new Date(doc.updated_at).toLocaleDateString()}</td>
+                    <td>
+                        <button class="btn btn-secondary btn-sm" onclick="editDocument(${doc.id})">Edit</button>
+                        <button class="btn btn-danger btn-sm" onclick="deleteDocument(${doc.id})">Delete</button>
+                    </td>
+                </tr>
+            `).join('');
+        } catch (error) {
+            document.getElementById('documents-table').innerHTML = `
+                <tr><td colspan="6" class="empty-state">Error loading documents</td></tr>
+            `;
+        }
+    }
+
+    async function editDocument(id) {
+        try {
+            const doc = await api(`/api/knowledge/documents/${id}`);
+
+            document.getElementById('modal-title').textContent = 'Edit Document';
+            document.getElementById('doc-id').value = doc.id;
+            document.getElementById('doc-title').value = doc.title;
+            document.getElementById('doc-category').value = doc.category || '';
+            document.getElementById('doc-tags').value = (doc.tags || []).join(', ');
+            document.getElementById('doc-content').value = doc.full_content;
+
+            openModal('add-modal');
+        } catch (error) {
+            showToast('Error loading document', 'error');
+        }
+    }
+
+    async function saveDocument() {
+        const id = document.getElementById('doc-id').value;
+        const data = {
+            title: document.getElementById('doc-title').value,
+            category: document.getElementById('doc-category').value || 'general',
+            tags: document.getElementById('doc-tags').value.split(',').map(t => t.trim()).filter(t => t),
+            content: document.getElementById('doc-content').value
+        };
+
+        if (!data.title || !data.content) {
+            showToast('Title and content are required', 'error');
+            return;
+        }
+
+        try {
+            if (id) {
+                await api(`/api/knowledge/documents/${id}`, {
+                    method: 'PUT',
+                    body: JSON.stringify(data)
+                });
+                showToast('Document updated');
+            } else {
+                await api('/api/knowledge/documents', {
+                    method: 'POST',
+                    body: JSON.stringify(data)
+                });
+                showToast('Document created');
+            }
+
+            closeModal('add-modal');
+            clearForm();
+            loadDocuments();
+            loadStatus();
+        } catch (error) {
+            showToast('Error saving document', 'error');
+        }
+    }
+
+    async function deleteDocument(id) {
+        if (!confirm('Are you sure you want to delete this document?')) return;
+
+        try {
+            await api(`/api/knowledge/documents/${id}`, { method: 'DELETE' });
+            showToast('Document deleted');
+            loadDocuments();
+            loadStatus();
+        } catch (error) {
+            showToast('Error deleting document', 'error');
+        }
+    }
+
+    function clearForm() {
+        document.getElementById('modal-title').textContent = 'Add Document';
+        document.getElementById('doc-id').value = '';
+        document.getElementById('doc-title').value = '';
+        document.getElementById('doc-category').value = '';
+        document.getElementById('doc-tags').value = '';
+        document.getElementById('doc-content').value = '';
+    }
+
+    document.getElementById('build-index-btn').addEventListener('click', async () => {
+        const btn = document.getElementById('build-index-btn');
+        btn.disabled = true;
+        btn.innerHTML = '<div class="spinner" style="width: 16px; height: 16px;"></div> Building...';
+
+        try {
+            const result = await api('/api/knowledge/build-index', { method: 'POST' });
+            showToast(`Index built successfully: ${result.document_count} documents`);
+            loadStatus();
+            loadDocuments();
+        } catch (error) {
+            showToast('Error building index: ' + error.message, 'error');
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg> Rebuild Index';
+        }
+    });
+
+    async function testSearch() {
+        const query = document.getElementById('search-query').value;
+        if (!query) return;
+
+        const results = document.getElementById('search-results');
+        results.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+
+        try {
+            const data = await api('/api/knowledge/search', {
+                method: 'POST',
+                body: JSON.stringify({ query, count: 3 })
+            });
+
+            if (data.results.length === 0) {
+                results.innerHTML = '<div style="color: #64748b; text-align: center;">No results found</div>';
+                return;
+            }
+
+            results.innerHTML = data.results.map((r, i) => `
+                <div style="background: #f8fafc; padding: 0.75rem; border-radius: 6px; margin-bottom: 0.5rem;">
+                    <div style="font-weight: 500; margin-bottom: 0.25rem;">Result ${i + 1} (Score: ${r.score.toFixed(3)})</div>
+                    <div style="font-size: 0.875rem; color: #64748b;">${r.content.substring(0, 200)}...</div>
+                </div>
+            `).join('');
+        } catch (error) {
+            results.innerHTML = '<div style="color: #dc2626;">Error searching</div>';
+        }
+    }
+
+    document.getElementById('filter-category').addEventListener('change', loadDocuments);
+
+    // Initialize
+    loadStatus();
+    loadCategories();
+    loadDocuments();
+</script>
+{% endblock %}

@@ -1,0 +1,127 @@
+{% extends "admin/base.html" %}
+
+{% block title %}Account Settings{% endblock %}
+{% block page_title %}Account Settings{% endblock %}
+
+{% block content %}
+<div class="grid grid-2">
+    <div class="card">
+        <div class="card-header">
+            <h3>Profile Information</h3>
+        </div>
+        <div class="card-body">
+            <form id="profile-form">
+                <div class="form-group">
+                    <label class="form-label">Name</label>
+                    <input type="text" class="form-input" name="name" id="profile-name" value="{{ user.name if user and user.name else '' }}">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Email</label>
+                    <input type="email" class="form-input" name="email" id="profile-email" value="{{ user.email if user else '' }}" disabled>
+                    <div class="form-hint">Email cannot be changed</div>
+                </div>
+                <button type="submit" class="btn btn-primary">Save Changes</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h3>Change Password</h3>
+        </div>
+        <div class="card-body">
+            <form id="password-form">
+                <div class="form-group">
+                    <label class="form-label">Current Password</label>
+                    <input type="password" class="form-input" name="current_password" id="current-password" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">New Password</label>
+                    <input type="password" class="form-input" name="new_password" id="new-password" required minlength="8">
+                    <div class="form-hint">Minimum 8 characters</div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Confirm New Password</label>
+                    <input type="password" class="form-input" name="confirm_password" id="confirm-password" required>
+                </div>
+                <button type="submit" class="btn btn-primary">Change Password</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h3>Account Details</h3>
+        </div>
+        <div class="card-body">
+            <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+                <div style="display: flex; justify-content: space-between; padding: 0.5rem 0; border-bottom: 1px solid #e2e8f0;">
+                    <span style="color: #64748b;">Account ID</span>
+                    <span style="font-family: monospace; font-size: 0.875rem;">{{ user.id[:8] if user else '' }}...</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; padding: 0.5rem 0; border-bottom: 1px solid #e2e8f0;">
+                    <span style="color: #64748b;">Member Since</span>
+                    <span id="member-since">{{ user.created_at if user and user.created_at else 'N/A' }}</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; padding: 0.5rem 0;">
+                    <span style="color: #64748b;">Account Status</span>
+                    <span class="badge badge-green">Active</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    // Update profile
+    document.getElementById('profile-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const name = document.getElementById('profile-name').value;
+
+        try {
+            await api('/api/profile', {
+                method: 'POST',
+                body: JSON.stringify({ name })
+            });
+            showToast('Profile updated successfully');
+        } catch (error) {
+            showToast('Error updating profile: ' + error.message, 'error');
+        }
+    });
+
+    // Change password
+    document.getElementById('password-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const currentPassword = document.getElementById('current-password').value;
+        const newPassword = document.getElementById('new-password').value;
+        const confirmPassword = document.getElementById('confirm-password').value;
+
+        if (newPassword !== confirmPassword) {
+            showToast('New passwords do not match', 'error');
+            return;
+        }
+
+        if (newPassword.length < 8) {
+            showToast('Password must be at least 8 characters', 'error');
+            return;
+        }
+
+        try {
+            await api('/api/auth/change-password', {
+                method: 'POST',
+                body: JSON.stringify({
+                    current_password: currentPassword,
+                    new_password: newPassword
+                })
+            });
+            showToast('Password changed successfully');
+            document.getElementById('password-form').reset();
+        } catch (error) {
+            showToast('Error changing password: ' + error.message, 'error');
+        }
+    });
+</script>
+{% endblock %}

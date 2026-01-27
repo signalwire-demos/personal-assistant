@@ -1,0 +1,153 @@
+{% extends "admin/base.html" %}
+
+{% block title %}Dashboard{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="grid grid-4" style="margin-bottom: 1.5rem;">
+    <div class="stat-card">
+        <div class="label">Messages</div>
+        <div class="value">{{ total_messages }}</div>
+        <div class="change">{{ unread_messages }} unread</div>
+    </div>
+    <a href="/admin/calls" class="stat-card" style="text-decoration: none; color: inherit;">
+        <div class="label">Total Calls</div>
+        <div class="value">{{ total_calls }}</div>
+        <div class="change">View history &rarr;</div>
+    </a>
+    <div class="stat-card">
+        <div class="label">FAQs</div>
+        <div class="value">{{ total_faqs }}</div>
+        <div class="change">Active questions</div>
+    </div>
+    <div class="stat-card">
+        <div class="label">Knowledge Docs</div>
+        <div class="value" id="knowledge-count">-</div>
+        <div class="change" id="knowledge-status">Loading...</div>
+    </div>
+</div>
+
+<div class="grid grid-2">
+    <div class="card">
+        <div class="card-header">
+            <h3>Recent Messages</h3>
+            <a href="/admin/messages" class="btn btn-secondary btn-sm">View All</a>
+        </div>
+        <div class="card-body" id="messages-container">
+            <div class="loading"><div class="spinner"></div></div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h3>Integration Status</h3>
+        </div>
+        <div class="card-body" id="integrations-container">
+            <div class="loading"><div class="spinner"></div></div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    // Load messages
+    async function loadMessages() {
+        try {
+            const messages = await api('/api/messages?limit=5');
+            const container = document.getElementById('messages-container');
+
+            if (messages.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
+                        <h4>No messages yet</h4>
+                        <p>Messages from callers will appear here</p>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = `
+                <table>
+                    <thead>
+                        <tr>
+                            <th>From</th>
+                            <th>Message</th>
+                            <th>Status</th>
+                            <th>Time</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${messages.map(msg => `
+                            <tr>
+                                <td><strong>${msg.caller_name || 'Unknown'}</strong><br><small style="color: #64748b;">${msg.caller_phone || ''}</small></td>
+                                <td>${msg.message.substring(0, 50)}${msg.message.length > 50 ? '...' : ''}</td>
+                                <td>
+                                    ${msg.urgency === 'urgent' ? '<span class="badge badge-red">Urgent</span>' : ''}
+                                    ${msg.status === 'unread' ? '<span class="badge badge-blue">Unread</span>' : '<span class="badge badge-gray">Read</span>'}
+                                </td>
+                                <td style="white-space: nowrap;">${new Date(msg.created_at).toLocaleDateString()}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            `;
+        } catch (error) {
+            document.getElementById('messages-container').innerHTML = `<div class="empty-state"><p>Error loading messages</p></div>`;
+        }
+    }
+
+    // Load integration status
+    async function loadIntegrations() {
+        const container = document.getElementById('integrations-container');
+        try {
+            const google = await api('/api/google/status');
+            const knowledge = await api('/api/knowledge/status');
+
+            container.innerHTML = `
+                <div style="display: flex; flex-direction: column; gap: 1rem;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem; background: #f8fafc; border-radius: 6px;">
+                        <div>
+                            <strong>Google Calendar & Gmail</strong>
+                            <div style="font-size: 0.8125rem; color: #64748b;">
+                                ${google.connected ? `Connected as ${google.email}` : 'Not connected'}
+                            </div>
+                        </div>
+                        <span class="badge ${google.connected ? 'badge-green' : 'badge-yellow'}">
+                            ${google.connected ? 'Connected' : 'Disconnected'}
+                        </span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem; background: #f8fafc; border-radius: 6px;">
+                        <div>
+                            <strong>Knowledge Base</strong>
+                            <div style="font-size: 0.8125rem; color: #64748b;">
+                                ${knowledge.total_documents} documents, ${knowledge.index_exists ? 'indexed' : 'not indexed'}
+                            </div>
+                        </div>
+                        <span class="badge ${knowledge.index_exists ? 'badge-green' : 'badge-yellow'}">
+                            ${knowledge.index_exists ? 'Active' : 'Needs Build'}
+                        </span>
+                    </div>
+                </div>
+                <div style="margin-top: 1rem;">
+                    <a href="/admin/integrations" class="btn btn-secondary btn-sm">Manage Integrations</a>
+                </div>
+            `;
+
+            // Update knowledge stats
+            document.getElementById('knowledge-count').textContent = knowledge.total_documents;
+            document.getElementById('knowledge-status').textContent = knowledge.index_exists ? 'Index ready' : 'Needs indexing';
+        } catch (error) {
+            container.innerHTML = `<div class="empty-state"><p>Error loading integration status</p></div>`;
+        }
+    }
+
+    // Load data
+    loadMessages();
+    loadIntegrations();
+
+    // Refresh periodically
+    setInterval(loadMessages, 30000);
+</script>
+{% endblock %}
