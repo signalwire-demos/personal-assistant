@@ -758,8 +758,7 @@ class EthanAgent(AgentBase):
                     "fillers": {
                         "en-US": [
                             "Searching for that...",
-                            "One moment...",
-                            "Let me look that up...",
+                                    "Let me look that up...",
                             "Checking our docs...",
                             "One sec...",
                             "Looking into that...",
@@ -788,8 +787,7 @@ class EthanAgent(AgentBase):
                 fillers={
                     "en-US": [
                         "Searching for that...",
-                        "One moment...",
-                        "Let me check...",
+                            "Let me check...",
                         "Looking that up...",
                         "One sec...",
                         "Checking...",
@@ -1820,7 +1818,6 @@ Return ONLY the JSON object, no other text.
             fillers={
                 "en-US": [
                     "Let me check...",
-                    "One moment...",
                     "Checking hours...",
                     "One sec...",
                     "Let me see...",
@@ -1841,7 +1838,6 @@ Return ONLY the JSON object, no other text.
             fillers={
                 "en-US": [
                     "Let me get that...",
-                    "One moment...",
                     "Pulling up hours...",
                     "One sec...",
                     "Here are the hours...",
@@ -1868,7 +1864,6 @@ Return ONLY the JSON object, no other text.
             fillers={
                 "en-US": [
                     "Let me get that...",
-                    "One moment...",
                     "Sure...",
                     "One sec...",
                     "Here's the info...",
@@ -1889,7 +1884,6 @@ Return ONLY the JSON object, no other text.
             fillers={
                 "en-US": [
                     "Let me check...",
-                    "One moment...",
                     "Pulling that up...",
                     "One sec...",
                     "Here's what we offer...",
@@ -1910,7 +1904,6 @@ Return ONLY the JSON object, no other text.
             fillers={
                 "en-US": [
                     "Let me get that...",
-                    "One moment...",
                     "Sure...",
                     "One sec...",
                     "Here's our location...",
@@ -1937,7 +1930,6 @@ Return ONLY the JSON object, no other text.
             fillers={
                 "en-US": [
                     "Checking that...",
-                    "One moment...",
                     "Let me see...",
                     "Looking that up...",
                     "One sec...",
@@ -1958,7 +1950,6 @@ Return ONLY the JSON object, no other text.
             fillers={
                 "en-US": [
                     "Let me check...",
-                    "One moment...",
                     "Pulling that up...",
                     "One sec...",
                     "Here's what's available...",
@@ -1999,7 +1990,6 @@ Return ONLY the JSON object, no other text.
                     "Got it...",
                     "Saving that...",
                     "Recording that...",
-                    "One moment...",
                     "Let me note that down...",
                     "I'll make sure they get this...",
                 ]
@@ -2023,7 +2013,6 @@ Return ONLY the JSON object, no other text.
             fillers={
                 "en-US": [
                     "Connecting you now...",
-                    "One moment...",
                     "Transferring...",
                     "Let me get them on the line...",
                     "Putting you through...",
@@ -2057,7 +2046,6 @@ Return ONLY the JSON object, no other text.
             fillers={
                 "en-US": [
                     "Checking availability...",
-                    "One moment...",
                     "Let me see what's open...",
                     "Looking at the schedule...",
                     "Checking the calendar...",
@@ -2078,7 +2066,6 @@ Return ONLY the JSON object, no other text.
             fillers={
                 "en-US": [
                     "Checking your appointments...",
-                    "One moment...",
                     "Let me look that up...",
                     "Pulling up the schedule...",
                     "One sec...",
@@ -2129,7 +2116,6 @@ Return ONLY the JSON object, no other text.
             fillers={
                 "en-US": [
                     "Booking that for you...",
-                    "One moment...",
                     "Setting that up...",
                     "Got it, scheduling now...",
                     "Adding that to the calendar...",
@@ -2156,7 +2142,6 @@ Return ONLY the JSON object, no other text.
             fillers={
                 "en-US": [
                     "Canceling that...",
-                    "One moment...",
                     "Removing that from the calendar...",
                     "Got it...",
                     "Taking care of that...",
@@ -2188,7 +2173,6 @@ Return ONLY the JSON object, no other text.
             fillers={
                 "en-US": [
                     "Sending that response...",
-                    "One moment...",
                     "Got it...",
                     "Updating your RSVP...",
                     "Done...",
@@ -2231,7 +2215,6 @@ Return ONLY the JSON object, no other text.
             fillers={
                 "en-US": [
                     "Updating that...",
-                    "One moment...",
                     "Making that change...",
                     "Got it...",
                     "Adjusting the calendar...",
@@ -2276,7 +2259,6 @@ Return ONLY the JSON object, no other text.
             fillers={
                 "en-US": [
                     "Sending that...",
-                    "One moment...",
                     "On its way...",
                     "Sending now...",
                     "Got it...",
@@ -2319,7 +2301,6 @@ Return ONLY the JSON object, no other text.
             fillers={
                 "en-US": [
                     "Sending that over...",
-                    "One moment...",
                     "Got it...",
                     "Passing that along...",
                     "On its way...",
@@ -2349,7 +2330,6 @@ Return ONLY the JSON object, no other text.
             fillers={
                 "en-US": [
                     "Checking your inbox...",
-                    "One moment...",
                     "Let me see...",
                     "Pulling up emails...",
                     "One sec...",
@@ -2370,7 +2350,6 @@ Return ONLY the JSON object, no other text.
             fillers={
                 "en-US": [
                     "Checking unread...",
-                    "One moment...",
                     "Let me see...",
                     "Looking at your inbox...",
                     "One sec...",
@@ -2397,7 +2376,6 @@ Return ONLY the JSON object, no other text.
             fillers={
                 "en-US": [
                     "Opening that...",
-                    "One moment...",
                     "Let me read that...",
                     "Pulling that up...",
                     "One sec...",
@@ -2427,7 +2405,6 @@ Return ONLY the JSON object, no other text.
                     "Done...",
                     "Got it...",
                     "Removing that...",
-                    "One moment...",
                     "Taken care of...",
                 ]
             }
@@ -2453,7 +2430,6 @@ Return ONLY the JSON object, no other text.
                     "Marking as read...",
                     "Done...",
                     "Got it...",
-                    "One moment...",
                     "Taken care of...",
                     "Updated...",
                 ]
@@ -2481,7 +2457,6 @@ Return ONLY the JSON object, no other text.
                     "Done...",
                     "Got it...",
                     "Moving to archive...",
-                    "One moment...",
                     "Taken care of...",
                 ]
             }
@@ -2507,7 +2482,6 @@ Return ONLY the JSON object, no other text.
             fillers={
                 "en-US": [
                     "Looking that up...",
-                    "One moment...",
                     "Checking contacts...",
                     "Let me see...",
                     "One sec...",
@@ -2534,7 +2508,6 @@ Return ONLY the JSON object, no other text.
             fillers={
                 "en-US": [
                     "Searching contacts...",
-                    "One moment...",
                     "Let me find them...",
                     "Looking that up...",
                     "One sec...",
@@ -2566,7 +2539,6 @@ Return ONLY the JSON object, no other text.
             fillers={
                 "en-US": [
                     "Checking messages...",
-                    "One moment...",
                     "Let me see...",
                     "Pulling those up...",
                     "One sec...",
@@ -2595,7 +2567,6 @@ Return ONLY the JSON object, no other text.
                     "Marking as read...",
                     "Done...",
                     "Got it...",
-                    "One moment...",
                     "Taken care of...",
                     "Updated...",
                 ]
@@ -2623,7 +2594,6 @@ Return ONLY the JSON object, no other text.
                     "Done...",
                     "Got it...",
                     "Removing that...",
-                    "One moment...",
                     "Taken care of...",
                 ]
             }
