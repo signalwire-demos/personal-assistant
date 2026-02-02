@@ -184,6 +184,7 @@ class EthanAgent(AgentBase):
             "ai_model": config.AI_MODEL,
             # "static_greeting": "Your call may be monitored or recorded for quality and training purposes.",
             "static_greeting_no_barge": True,
+            "turn_detection_timeout": 1000,
         })
 
         # Add speech recognition hints
@@ -1231,13 +1232,6 @@ Return ONLY the JSON object, no other text.
             bullets=capabilities
         )
 
-        # Business hours context
-        hours_text = self._format_business_hours()
-        self.prompt_add_section(
-            "Business Information",
-            body=f"Current business hours:\n{hours_text}"
-        )
-
     def _format_business_hours(self) -> str:
         """Format business hours for display (uses default/init config)"""
         days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
@@ -1484,12 +1478,13 @@ Return ONLY the JSON object, no other text.
             .set_text(
                 "A customer wants to CANCEL their appointment.\n\n"
                 "STEP BY STEP:\n"
-                "1. CALL find_my_appointments tool to look up their appointments\n"
-                "2. Tell them what appointments they have\n"
-                "3. Ask which one they want to cancel\n"
-                "4. CALL cancel_appointment tool with the event_id\n"
-                "5. Confirm it's cancelled\n"
-                "6. Ask if they'd like to rebook for another time"
+                "1. Ask the caller for the name the appointment is under\n"
+                "2. CALL find_my_appointments with their name (and phone/email if they provide it)\n"
+                "3. Tell them what appointments were found\n"
+                "4. Ask which one they want to cancel\n"
+                "5. CALL cancel_appointment tool with the event_id\n"
+                "6. Confirm it's cancelled\n"
+                "7. Ask if they'd like to rebook for another time"
             ) \
             .set_functions(["find_my_appointments", "cancel_appointment", "check_calendar_availability", "book_appointment"]) \
             .set_valid_contexts(["default", "schedule"]) \
@@ -2081,10 +2076,23 @@ Return ONLY the JSON object, no other text.
         # Find Appointments (for owner to see what's on calendar)
         self.define_tool(
             name="find_my_appointments",
-            description="Find upcoming appointments on the calendar. For OWNER: returns all appointments, no parameters needed. For CUSTOMERS: automatically uses their phone number to find their appointments.",
+            description="Find upcoming appointments on the calendar. For OWNER: returns all appointments, no parameters needed. For CUSTOMERS: ASK the caller for their name to look up their appointment. Also ask for phone or email if needed. Pass whatever they provide.",
             parameters={
                 "type": "object",
-                "properties": {},
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "description": "Customer's name"
+                    },
+                    "phone": {
+                        "type": "string",
+                        "description": "Customer's phone number"
+                    },
+                    "email": {
+                        "type": "string",
+                        "description": "Customer's email address"
+                    }
+                },
             },
             handler=self._find_my_appointments,
             fillers={
@@ -3452,31 +3460,36 @@ Return ONLY the JSON object, no other text.
             if is_owner_calling:
                 matching = appointments
             else:
-                # For customers: filter by phone/email
-                phone = args.get("phone") or global_data.get("caller_phone") or raw_data.get("caller_id_num", "")
-                email = args.get("email") or global_data.get("caller_email", "")
+                # For customers: search by name, phone, or email
+                name = args.get("name") or ""
+                phone = args.get("phone") or ""
+                email = args.get("email") or ""
 
-                if not phone and not email:
+                if not name and not phone and not email:
                     return SwaigFunctionResult(
-                        "I need your phone number or email to look up your appointments. "
-                        "Which would you like to provide?"
+                        "I need your name to look up your appointment. "
+                        "Could you tell me the name it was booked under?"
                     )
 
                 # Filter appointments that match the caller
                 matching = []
                 # Normalize phone for comparison (last 10 digits)
                 normalized_phone = ''.join(filter(str.isdigit, phone))[-10:] if phone else ""
+                normalized_name = name.strip().lower() if name else ""
 
                 for apt in appointments:
-                    # Check description for phone match
-                    description = (apt.get("description") or "")
+                    summary = (apt.get("summary") or "").lower()
+                    description = (apt.get("description") or "").lower()
                     description_digits = ''.join(filter(str.isdigit, description))
                     attendees = [a.lower() for a in apt.get("attendees", []) if a]
 
+                    name_match = normalized_name and (
+                        normalized_name in summary or normalized_name in description
+                    )
                     phone_match = normalized_phone and normalized_phone in description_digits
                     email_match = email and email.lower() in attendees
 
-                    if phone_match or email_match:
+                    if name_match or phone_match or email_match:
                         matching.append(apt)
 
                 if not matching:

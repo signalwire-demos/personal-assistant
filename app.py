@@ -58,6 +58,25 @@ async def lifespan(app: FastAPI):
     print(f"Admin panel at /admin")
     print(f"Health check at /health")
 
+    # Mount agent testing module if enabled
+    if os.environ.get("ENABLE_TESTING", "").lower() in ("1", "true", "yes"):
+        from signalwire_agent_tester import TestSuite
+        TestSuite(
+            app=app,
+            signalwire_space=config.SIGNALWIRE_SPACE_NAME,
+            signalwire_project_id=config.SIGNALWIRE_PROJECT_ID,
+            signalwire_token=config.SIGNALWIRE_TOKEN,
+            public_url=config.SWML_PROXY_URL_BASE,
+            from_number=os.environ.get("TESTER_FROM_NUMBER", ""),
+            target_number=os.environ.get("TARGET_NUMBER", ""),
+            tap_uri=os.environ.get("TESTER_TAP_URI", ""),
+            personas_dir="tests/personas",
+            goals_dir="tests/goals",
+            results_dir="tests/results",
+            basic_auth=config.get_basic_auth(),
+        )
+        print(f"Agent testing at /testing")
+
     yield
 
     # Shutdown
@@ -86,8 +105,8 @@ async def auth_middleware(request: Request, call_next):
     """Middleware to protect admin routes"""
     path = request.url.path
 
-    # Protect admin pages (HTML pages)
-    if path.startswith("/admin"):
+    # Protect admin pages and testing UI (HTML pages)
+    if path.startswith("/admin") or path == "/testing" or path == "/testing/":
         user = await get_current_user(request)
         if not user:
             return RedirectResponse(url="/login", status_code=302)
@@ -95,7 +114,8 @@ async def auth_middleware(request: Request, call_next):
         request.state.user = user
 
     # Protect API routes (except auth routes which handle their own auth)
-    elif path.startswith("/api/"):
+    # /testing/_tester and /testing/_webhook stay unprotected (SignalWire needs access)
+    elif path.startswith("/api/") or path.startswith("/testing/_api"):
         user = await get_current_user(request)
         if not user:
             return JSONResponse(

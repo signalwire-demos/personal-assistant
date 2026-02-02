@@ -1,6 +1,9 @@
 # SignalWire Agents SDK with RAG support
 signalwire-agents[search-full]>=1.0.18
 
+# Agent testing harness
+signalwire-agent-tester @ file:///Users/brian/workdir/swtest
+
 # Web framework
 fastapi>=0.100.0
 uvicorn[standard]>=0.22.0

@@ -59,7 +59,7 @@ AGENT_LANGUAGE = "en-US"
 AI_MODEL = os.getenv("AI_MODEL", "gpt-oss-120b")
 
 # Speech Settings
-END_OF_SPEECH_TIMEOUT = 500  # ms
+END_OF_SPEECH_TIMEOUT = 1700  # ms
 ATTENTION_TIMEOUT = 15000    # ms
 INACTIVITY_TIMEOUT = 30000   # ms
 
