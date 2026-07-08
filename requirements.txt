@@ -1,8 +1,10 @@
 # SignalWire Agents SDK with RAG support
-signalwire-agents[search-full]>=1.0.18
+signalwire-sdk[search-full]>=3.0.2
 
 # Agent testing harness
-signalwire-agent-tester @ file:///Users/brian/workdir/swtest
+# signalwire-agent-tester: local dev-only eval harness (was a file:/// path that only
+# resolved on the original author machine). Only imported when ENABLE_TESTING=1.
+# Install it manually in that case; left out so `pip install -r` works everywhere.
 
 # Web framework
 fastapi>=0.100.0
@@ -21,7 +23,7 @@ google-auth-oauthlib>=1.1.0
 python-dotenv>=1.0.0
 pytz>=2024.1
 jinja2>=3.1.0
-python-multipart>=0.0.6
+python-multipart>=0.0.18
 
 # Authentication
 bcrypt>=4.0.0
