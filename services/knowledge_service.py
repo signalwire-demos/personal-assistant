@@ -218,7 +218,7 @@ id: {doc.id}
     def build_index(self, force: bool = False, user_id: str = None) -> Dict:
         """Build or rebuild the search index for a user"""
         try:
-            from signalwire_agents.search import IndexBuilder
+            from signalwire.search import IndexBuilder
 
             # Get user-specific paths
             docs_dir = self._get_user_documents_dir(user_id)
@@ -371,8 +371,8 @@ id: {doc.id}
             return []
 
         try:
-            from signalwire_agents.search import SearchEngine
-            from signalwire_agents.search.query_processor import preprocess_query
+            from signalwire.search import SearchEngine
+            from signalwire.search.query_processor import preprocess_query
 
             engine = SearchEngine(
                 backend="sqlite",
